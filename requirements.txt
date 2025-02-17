@@ -1,0 +1,13 @@
+langchain_openai
+langchain_core
+python-dotenv
+streamlit
+langchain_community
+langserve
+fastapi
+uvicorn
+deep-translator
+langchain_groq
+chromadb
+ragas
+langchain_huggingface
