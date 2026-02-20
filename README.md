@@ -13,11 +13,11 @@ InfoBuddy is a **Streamlit-based conversational chatbot** (“InfoBot”) focuse
 - Environment-based configuration via `.env` (Groq, LangChain, OpenAI, Gemini, HF )
 
 ---
-<img width="928" height="731" alt="image" src="https://github.com/user-attachments/assets/38250108-b0be-4723-b54b-8ddef6fd4c7f" />
+<img width="925" height="731" alt="image" src="https://github.com/user-attachments/assets/38250108-b0be-4723-b54b-8ddef6fd4c7f" />
 
-<img width="602" height="564" alt="image" src="https://github.com/user-attachments/assets/5c897a79-f4cf-4ffb-b584-36978f492714" />
+<img width="925"  alt="image" src="https://github.com/user-attachments/assets/5c897a79-f4cf-4ffb-b584-36978f492714" />
 
-<img width="829" height="807" alt="image" src="https://github.com/user-attachments/assets/14558113-8f63-4c57-9676-318b6695e675" />
+<img width="925" alt="image" src="https://github.com/user-attachments/assets/14558113-8f63-4c57-9676-318b6695e675" />
 
 
 ## How It Works (Architecture)
