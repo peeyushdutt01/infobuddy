@@ -36,7 +36,7 @@ def create_prompt(context, question):
     """Create the prompt for the chatbot based on the conversation context and user question."""
     context_str = "\n".join([f"{msg['role']}: {msg['content']}" for msg in context])
     return [
-        ("system", f"You are InfoBot, a helpful college chatbot. Your work is to provide CONCISE information. Be helpful with the user and provide help for their queries. Here is the conversation history:\n{context_str}"),
+        ("system", f"You are InfoBuddy, a helpful college chatbot. Your work is to provide concise information. Be helpful with the user and provide help for their queries. Here is the conversation history:\n{context_str}"),
         ("user", f"Question: {question}")
     ]
 

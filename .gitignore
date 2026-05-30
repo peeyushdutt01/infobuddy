@@ -1,1 +1,3 @@
-/datastore_db_new
+datastore_db_new/
+.env.dev
+improvements.md
