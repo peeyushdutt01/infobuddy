@@ -1,38 +1,43 @@
 import numpy as np
+import fitz
+import re
+import spacy
 from sklearn.metrics.pairwise import cosine_similarity
 from langchain_huggingface import HuggingFaceEmbeddings
+from spacy.cli import download
+
+download("en_core_web_sm")
+nlp = spacy.load("en_core_web_sm")
 
 model = HuggingFaceEmbeddings(model = "BAAI/bge-small-en-v1.5")
 
 
 def semantic_chunking(
-    sentences: list[str],
+    data: list[dict],
     model,
     max_words: int = 120,
     percentile: int = 20,
     overlap_sentences: int = 1
-) -> list[list[str]]:
-    """
-    Semantic chunking using:
-    - Precomputed embeddings
-    - Adaptive percentile threshold
-    - Running word count
-    - Running centroid
-    - Optional sentence overlap
-    """
+)-> list[dict] :
 
-    if not sentences:
+    if not data:
         return []
 
-    # Generate embeddings once
+    sentences = [
+        item["content"]
+        for item in data
+    ]
+
+    # Embedding all sentences at once
     sentence_embeddings = np.array(
         model.embed_documents(sentences)
     )
 
-    # Compute adjacent similarities
+    # similarity with the previous sentence for calculating the threshold 
     adjacent_similarities = []
 
     for i in range(len(sentence_embeddings) - 1):
+
         score = cosine_similarity(
             [sentence_embeddings[i]],
             [sentence_embeddings[i + 1]]
@@ -40,7 +45,7 @@ def semantic_chunking(
 
         adjacent_similarities.append(score)
 
-    # Adaptive threshold
+    # Adaptive threshold for the similarity scores
     threshold = np.percentile(
         adjacent_similarities,
         percentile
@@ -48,8 +53,18 @@ def semantic_chunking(
 
     chunks = []
 
-    current_chunk = [sentences[0]]
-    current_embeddings = [sentence_embeddings[0]]
+    current_chunk = {
+        "content": [sentences[0]],
+        "metadata": {
+            "page_start": data[0]["metadata"]["page"],
+            "page_end": data[0]["metadata"]["page"],
+            "source": data[0]["metadata"]["source"]
+        }
+    }
+
+    current_embeddings = [
+        sentence_embeddings[0]
+    ]
 
     current_word_count = len(
         sentences[0].split()
@@ -64,6 +79,7 @@ def semantic_chunking(
         next_sentence = sentences[i]
         next_embedding = sentence_embeddings[i]
 
+        # running centroid for topic similarity
         centroid = (
             running_sum /
             len(current_embeddings)
@@ -85,10 +101,16 @@ def semantic_chunking(
 
         if should_split:
 
-            chunks.append(current_chunk)
+            chunks.append({
+                "content": " ".join(
+                    current_chunk["content"]
+                ),
+                "metadata": current_chunk["metadata"]
+            })
 
-            overlap_chunk = (
-                current_chunk[-overlap_sentences:]
+            # overlap content
+            overlap_content = (
+                current_chunk["content"][-overlap_sentences:]
                 if overlap_sentences > 0
                 else []
             )
@@ -99,31 +121,137 @@ def semantic_chunking(
                 else []
             )
 
-            current_chunk = overlap_chunk.copy()
+            if overlap_content:
+
+                overlap_start_idx = max(
+                    0,
+                    i - overlap_sentences
+                )
+
+                current_chunk = {
+                    "content": overlap_content.copy(),
+                    "metadata": {
+                        "page_start": data[
+                            overlap_start_idx
+                        ]["metadata"]["page"],
+
+                        "page_end": data[
+                            i - 1
+                        ]["metadata"]["page"],
+
+                        "source": data[
+                            i - 1
+                        ]["metadata"]["source"]
+                    }
+                }
+
+            else:
+
+                current_chunk = {
+                    "content": [],
+                    "metadata": {
+                        "page_start": data[i]["metadata"]["page"],
+                        "page_end": data[i]["metadata"]["page"],
+                        "source": data[i]["metadata"]["source"]
+                    }
+                }
+
             current_embeddings = overlap_embeddings.copy()
 
             current_word_count = sum(
-                len(s.split())
-                for s in current_chunk
+                len(sentence.split())
+                for sentence in current_chunk["content"]
             )
 
             if current_embeddings:
+
                 running_sum = np.sum(
                     current_embeddings,
                     axis=0
                 )
+
             else:
+
                 running_sum = np.zeros_like(
                     next_embedding
                 )
 
-        current_chunk.append(next_sentence)
-        current_embeddings.append(next_embedding)
+        # add current sentence
+
+        current_chunk["content"].append(
+            next_sentence
+        )
+
+        current_chunk["metadata"]["page_end"] = (
+            data[i]["metadata"]["page"]
+        )
+
+        current_embeddings.append(
+            next_embedding
+        )
 
         current_word_count += next_words
+
         running_sum += next_embedding
 
-    if current_chunk:
-        chunks.append(current_chunk)
+
+    if current_chunk["content"]:
+
+        chunks.append({
+            "content": " ".join(
+                current_chunk["content"]
+            ),
+            "metadata": current_chunk["metadata"]
+        })
 
     return chunks
+
+def process_pdf(pdf_path: str):
+
+    doc = fitz.open(pdf_path)
+
+    corpus = []
+
+    for page_num, page in enumerate(doc):
+
+        # Extract text
+        text = page.get_text()
+
+        # Clean text
+        text = re.sub(r"\s+", " ", text)
+        text = text.strip()
+
+        # Sentence segmentation
+        sentences = [
+            sent.text.strip()
+            for sent in nlp(text).sents
+        ]
+
+        # Store sentences with metadata
+        for sentence in sentences:
+
+            corpus.append({
+                "content": sentence,
+                "metadata": {
+                    "page": page_num + 1,
+                    "source": pdf_path
+                }
+            })
+
+    return corpus
+
+corpus = process_pdf("E:\projects\infobuddy\AI Engineer Career Trends and Key Requirements.pdf")
+
+chunks = semantic_chunking(
+    corpus,
+    model=model
+)
+
+def embed_chunks(chunks: list[dict]) -> list:
+    texts = [
+    chunk["content"]
+    for chunk in chunks
+    ]
+    embeddings = model.embed_documents(texts)
+
+    return embeddings
