@@ -8,6 +8,21 @@ from langchain_community.embeddings.huggingface import HuggingFaceEmbeddings  # 
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_groq import ChatGroq
+from ingest import process_pdf, add_chunks_to_chroma, semantic_chunking
+from reranker import rerank_retrieval
+from sentence_transformers import CrossEncoder
+from sklearn.metrics.pairwise import cosine_similarity
+from langchain_huggingface import HuggingFaceEmbeddings
+import chromadb
+import uuid
+
+
+# download("en_core_web_sm")
+# nlp = spacy.load("en_core_web_sm")
+
+model = HuggingFaceEmbeddings(model = "BAAI/bge-small-en-v1.5")
+
+reranker = CrossEncoder("BAAI/bge-reranker-v2-m3")
 
 # Load environment variables
 load_dotenv()
@@ -15,6 +30,49 @@ os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 os.environ["LANGCHAIN_TRACING_V2"] = "true"
 os.environ["LANGCHAIN_API_KEY"] = os.getenv("LANGCHAIN_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+
+
+def retrieve(
+    query,
+    collection,
+    model,
+    k=5
+):
+
+    query_embedding = model.embed_query(
+        query
+    )
+
+    return collection.query(
+        query_embeddings=[
+            query_embedding
+        ],
+        n_results=k
+    )
+
+corpus = process_pdf("sample.pdf")
+
+chunks = semantic_chunking(
+    corpus,
+    model=model
+)
+
+client = chromadb.PersistentClient(
+    path="./chroma_db"
+)
+
+collection = client.get_or_create_collection(
+    name = "documents"
+)
+
+add_chunks_to_chroma(collection, chunks, model)
+
+if __name__ == "__main__":
+    query = input("Query : ")
+    while (query != "Exit" and query != "exit"):
+        result = retrieve(query, collection, model, 3)
+        print(result)
+        query = input("Query : ")
 
 # Suppress TensorFlow oneDNN warnings
 os.environ['TF_ENABLE_ONEDNN_OPTS'] = '0'

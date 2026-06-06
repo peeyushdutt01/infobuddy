@@ -1,16 +1,14 @@
 import numpy as np
 import fitz
 import re
-import spacy
 from sklearn.metrics.pairwise import cosine_similarity
-from langchain_huggingface import HuggingFaceEmbeddings
+import uuid
+import spacy
 from spacy.cli import download
+
 
 download("en_core_web_sm")
 nlp = spacy.load("en_core_web_sm")
-
-model = HuggingFaceEmbeddings(model = "BAAI/bge-small-en-v1.5")
-
 
 def semantic_chunking(
     data: list[dict],
@@ -240,18 +238,35 @@ def process_pdf(pdf_path: str):
 
     return corpus
 
-corpus = process_pdf("E:\projects\infobuddy\AI Engineer Career Trends and Key Requirements.pdf")
+def add_chunks_to_chroma(
+    collection,
+    chunks,
+    model
+):
 
-chunks = semantic_chunking(
-    corpus,
-    model=model
-)
-
-def embed_chunks(chunks: list[dict]) -> list:
-    texts = [
-    chunk["content"]
-    for chunk in chunks
+    documents = [
+        chunk["content"]
+        for chunk in chunks
     ]
-    embeddings = model.embed_documents(texts)
 
-    return embeddings
+    metadatas = [
+        chunk["metadata"]
+        for chunk in chunks
+    ]
+
+    embeddings = model.embed_documents(
+        documents
+    )
+
+    ids = [
+        str(uuid.uuid4())        
+        for _ in chunks
+    ]
+
+    collection.add(
+        ids=ids,
+        documents=documents,
+        embeddings=embeddings,
+        metadatas=metadatas
+    )
+
